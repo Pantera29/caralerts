@@ -66,14 +66,16 @@ export function AlertForm() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/alerts", {
+      const response = await fetch("https://kavak-meli-bot.francolonghi29.workers.dev/api/alerts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
+        mode: "cors",
+        credentials: "omit",
         body: JSON.stringify(formData)
       });
-
+      
       const data = await response.json();
 
       if (data.success) {
