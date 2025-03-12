@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Search, CarFront, AlertCircle } from 'lucide-react';
+import { X, CarFront, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { modelosPorMarca } from '@/data/car-models';
