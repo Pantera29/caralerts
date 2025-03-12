@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { AlertFormData } from "@/types/alert";
+import { AlertFormData, NotificationFrequency } from "@/types/alert";
 import { CAR_BRANDS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
-import { InfoIcon, X } from "lucide-react";
+import { InfoIcon, X, Bell } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const initialFormData: AlertFormData = {
   nombre_busqueda: "",
@@ -20,7 +21,8 @@ const initialFormData: AlertFormData = {
   anio_maximo: new Date().getFullYear(),
   precio_maximo: 500000,
   kilometraje_maximo: 100000,
-  telegram_chat_id: ""
+  telegram_chat_id: "",
+  frecuencia: "diaria"
 };
 
 export function AlertForm() {
@@ -66,6 +68,9 @@ export function AlertForm() {
     setIsSubmitting(true);
 
     try {
+      console.log('Enviando formData:', formData);
+      console.log('Frecuencia seleccionada:', formData.frecuencia);
+      
       const response = await fetch("https://kavak-meli-bot.francolonghi29.workers.dev/api/alerts", {
         method: "POST",
         headers: {
@@ -77,6 +82,7 @@ export function AlertForm() {
       });
       
       const data = await response.json();
+      console.log('Respuesta del servidor:', data);
 
       if (data.success) {
         toast.success("¡Alerta creada con éxito!", {
@@ -232,29 +238,78 @@ export function AlertForm() {
             <Separator />
 
             {/* Sección de Notificaciones */}
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="flex items-center gap-2">
-                <Label htmlFor="telegram_chat_id">Chat ID de Telegram</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full p-0">
-                      <InfoIcon className="h-4 w-4" />
-                      <span className="sr-only">Información sobre Chat ID</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" align="center" className="max-w-xs">
-                    <p>Para obtener tu Chat ID, inicia una conversación con @userinfobot en Telegram y te enviará tu ID.</p>
-                  </TooltipContent>
-                </Tooltip>
+                <Bell className="h-5 w-5 text-muted-foreground" />
+                <h3 className="text-lg font-medium">Notificaciones</h3>
               </div>
-              <Input
-                id="telegram_chat_id"
-                name="telegram_chat_id"
-                placeholder="Ej: 123456789"
-                value={formData.telegram_chat_id}
-                onChange={handleInputChange}
-                required
-              />
+
+              <div className="space-y-4">
+                <Label>Frecuencia de notificaciones</Label>
+                <RadioGroup
+                  value={formData.frecuencia}
+                  onValueChange={(value) => 
+                    setFormData({
+                      ...formData,
+                      frecuencia: value as NotificationFrequency
+                    })
+                  }
+                  className="space-y-4"
+                >
+                  <div className="flex items-start space-x-4 rounded-md border p-4">
+                    <RadioGroupItem value="horaria" id="horaria" />
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor="horaria" className="font-medium">Cada hora</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Recibirás notificaciones cada hora si hay vehículos nuevos que coincidan con tus criterios.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-4 rounded-md border p-4">
+                    <RadioGroupItem value="cada12horas" id="cada12horas" />
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor="cada12horas" className="font-medium">Dos veces al día</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Recibirás notificaciones a las 8:00 AM y 8:00 PM si hay vehículos nuevos.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-4 rounded-md border p-4">
+                    <RadioGroupItem value="diaria" id="diaria" />
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor="diaria" className="font-medium">Una vez al día</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Recibirás una notificación diaria a las 8:00 AM con los vehículos nuevos.
+                      </p>
+                    </div>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="telegram_chat_id">Chat ID de Telegram</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full p-0">
+                        <InfoIcon className="h-4 w-4" />
+                        <span className="sr-only">Información sobre Chat ID</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" align="center" className="max-w-xs">
+                      <p>Para obtener tu Chat ID, inicia una conversación con @userinfobot en Telegram y te enviará tu ID.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Input
+                  id="telegram_chat_id"
+                  name="telegram_chat_id"
+                  placeholder="Ej: 123456789"
+                  value={formData.telegram_chat_id}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
             </div>
           </CardContent>
           
