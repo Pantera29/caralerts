@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AlertFormData, NotificationFrequency } from "@/types/alert";
 import { toast } from "sonner";
 import { 
@@ -10,7 +10,12 @@ import {
   DollarSign, 
   Gauge, 
   Send, 
-  Tag
+  Tag,
+  ExternalLink,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle,
+  Loader2
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -22,6 +27,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { BrandSelectorSimple } from "@/components/ui/brand-selector-simple";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
 
 const initialFormData: AlertFormData = {
   nombre_busqueda: "",
@@ -34,11 +41,46 @@ const initialFormData: AlertFormData = {
   frecuencia: "diaria"
 };
 
+// Tipo para los resultados de la búsqueda
+interface SearchResults {
+  kavak: {
+    count: number;
+    url: string;
+  };
+  mercadoLibre: {
+    count: number;
+    url: string;
+  };
+  telegramSent: boolean;
+  noAlertsToProcess?: boolean;
+}
+
 export function AlertForm() {
   const [formData, setFormData] = useState<AlertFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof AlertFormData, string>>>({});
   const [isFormValid, setIsFormValid] = useState(false);
+  
+  // Nuevos estados para la funcionalidad de búsqueda inmediata
+  const [searchingResults, setSearchingResults] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  
+  // Referencia para el scroll automático a los resultados
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  // Efecto para hacer scroll hacia los resultados cuando estén disponibles
+  useEffect(() => {
+    if ((searchResults || searchError) && !searchingResults && resultsRef.current) {
+      // Pequeño timeout para asegurar que los componentes se han renderizado
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 100);
+    }
+  }, [searchResults, searchError, searchingResults]);
 
   useEffect(() => {
     // Verificar si el formulario es válido
@@ -104,18 +146,12 @@ export function AlertForm() {
   };
 
   const handleBrandChange = (value: string | string[]) => {
-    console.log("AlertForm - handleBrandChange recibió:", value);
-    
+    // Asegurar que marcas siempre sea un array
     const brands = Array.isArray(value) ? value : [value];
-    console.log("AlertForm - brands array:", brands);
     
-    setFormData(prevData => {
-      const newFormData = {
-        ...prevData,
-        marcas: brands
-      };
-      console.log("AlertForm - nuevo formData:", newFormData);
-      return newFormData;
+    setFormData({
+      ...formData,
+      marcas: brands
     });
     
     // Validar después de actualizar
@@ -124,6 +160,133 @@ export function AlertForm() {
       ...prev,
       marcas: error
     }));
+  };
+
+  // Función para ejecutar la búsqueda inmediata
+  const runImmediateSearch = async () => {
+    setSearchingResults(true);
+    setSearchError(null);
+    
+    try {
+      const response = await fetch("https://kavak-meli-bot.francolonghi29.workers.dev/run", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        mode: "cors",
+        credentials: "omit"
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error al ejecutar la búsqueda: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Resultados de la búsqueda:', data);
+      
+      // Si el formato de respuesta incluye resultados directamente (como en el telegram)
+      if (data.kavak && typeof data.kavak === 'string' && data.kavak.includes('resultados')) {
+        // Ejemplo: "16+ resultados" -> extraer el número
+        const kavakCountMatch = data.kavak.match(/(\d+)(\+)?\s+resultados/);
+        const mercadoLibreCountMatch = data.mercadoLibre && data.mercadoLibre.match(/(\d+)(\+)?\s+resultados/);
+        
+        const kavakCount = kavakCountMatch ? parseInt(kavakCountMatch[1]) : 0;
+        const mercadoLibreCount = mercadoLibreCountMatch ? parseInt(mercadoLibreCountMatch[1]) : 0;
+        
+        // Extraer las URLs correctas
+        let kavakUrl = '#';
+        let mercadoLibreUrl = '#';
+        
+        // Buscar URLs como objetos o como propiedades directas
+        if (data.urls) {
+          kavakUrl = data.urls.kavak || '#';
+          mercadoLibreUrl = data.urls.mercadoLibre || '#';
+        } else {
+          kavakUrl = data.kavakUrl || data.kavak_url || '#';
+          mercadoLibreUrl = data.mercadoLibreUrl || data.mercadolibre_url || '#';
+        }
+        
+        // Crear un objeto con el formato que espera nuestro componente
+        setSearchResults({
+          kavak: {
+            count: kavakCount,
+            url: kavakUrl
+          },
+          mercadoLibre: {
+            count: mercadoLibreCount,
+            url: mercadoLibreUrl
+          },
+          telegramSent: data.telegramSent || true
+        });
+        
+        if (kavakCount > 0 || mercadoLibreCount > 0) {
+          toast.success("¡Búsqueda completada con éxito!", {
+            description: `Se encontraron resultados: ${kavakCount} en Kavak y ${mercadoLibreCount} en Mercado Libre.`
+          });
+        } else {
+          toast.info("Búsqueda completada", {
+            description: "No se encontraron vehículos que coincidan con tus criterios en este momento."
+          });
+        }
+        return;
+      }
+      
+      // Si no hay resultados específicos, crear un objeto con valores predeterminados
+      if (data.success && !data.kavak && !data.mercadoLibre) {
+        // API devolvió éxito pero sin resultados detallados
+        if (data.message && data.message.includes("No hay alertas")) {
+          toast.info("No hay alertas para procesar", {
+            description: "La alerta se ha creado correctamente, pero no hay resultados disponibles en este momento."
+          });
+          
+          // Crear resultados simulados para mostrar el componente de resultados
+          setSearchResults({
+            kavak: {
+              count: 0,
+              url: '#'
+            },
+            mercadoLibre: {
+              count: 0,
+              url: '#'
+            },
+            telegramSent: false,
+            noAlertsToProcess: true
+          });
+          return;
+        }
+      }
+      
+      // Formato original esperado por el componente
+      setSearchResults({
+        kavak: {
+          count: data.kavak?.count || 0,
+          url: data.kavak?.url || '#'
+        },
+        mercadoLibre: {
+          count: data.mercadoLibre?.count || 0,
+          url: data.mercadoLibre?.url || '#'
+        },
+        telegramSent: data.telegramSent || false
+      });
+      
+      if (data.kavak?.count > 0 || data.mercadoLibre?.count > 0) {
+        toast.success("¡Búsqueda completada con éxito!", {
+          description: `Se encontraron resultados: ${data.kavak?.count || 0} en Kavak y ${data.mercadoLibre?.count || 0} en Mercado Libre.`
+        });
+      } else {
+        toast.info("Búsqueda completada", {
+          description: "No se encontraron vehículos que coincidan con tus criterios en este momento."
+        });
+      }
+    } catch (error) {
+      console.error('Error al ejecutar la búsqueda:', error);
+      setSearchError(error instanceof Error ? error.message : 'Error desconocido');
+      toast.error("Error al ejecutar la búsqueda", {
+        description: "No se pudieron obtener los resultados. Por favor, intenta nuevamente."
+      });
+    } finally {
+      setSearchingResults(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -152,10 +315,18 @@ export function AlertForm() {
     }
     
     setIsSubmitting(true);
+    setSearchResults(null);
+    setSearchError(null);
 
     try {
       console.log('Enviando formData:', formData);
       console.log('Frecuencia seleccionada:', formData.frecuencia);
+      
+      // Agregar flag para ejecutar inmediatamente
+      const requestData = {
+        ...formData,
+        ejecutar_inmediatamente: true
+      };
       
       const response = await fetch("https://kavak-meli-bot.francolonghi29.workers.dev/api/alerts", {
         method: "POST",
@@ -164,7 +335,7 @@ export function AlertForm() {
         },
         mode: "cors",
         credentials: "omit",
-        body: JSON.stringify(formData)
+        body: JSON.stringify(requestData)
       });
       
       const data = await response.json();
@@ -172,8 +343,49 @@ export function AlertForm() {
 
       if (data.success) {
         toast.success("¡Alerta creada con éxito!", {
-          description: "Recibirás notificaciones en Telegram cuando encontremos vehículos que coincidan con tus criterios."
+          description: "Verificando si hay vehículos disponibles..."
         });
+        
+        // NUEVO: Si la respuesta ya incluye resultados de ejecución inmediata
+        if (data.ejecucion?.realizada) {
+          // Usar los resultados directamente de la respuesta
+          setSearchResults({
+            kavak: {
+              count: data.ejecucion.kavak?.count || 0,
+              url: data.ejecucion.kavak?.url || '#'
+            },
+            mercadoLibre: {
+              count: data.ejecucion.mercadoLibre?.count || 0,
+              url: data.ejecucion.mercadoLibre?.url || '#'
+            },
+            telegramSent: data.ejecucion.telegramSent || false
+          });
+          
+          // Mostrar mensaje apropiado según los resultados
+          const kavakCount = data.ejecucion.kavak?.count || 0;
+          const mlCount = data.ejecucion.mercadoLibre?.count || 0;
+          
+          if (kavakCount > 0 || mlCount > 0) {
+            toast.success("¡Se encontraron vehículos!", {
+              description: `Encontramos ${kavakCount} en Kavak y ${mlCount} en Mercado Libre.`
+            });
+          } else {
+            toast.info("Búsqueda completada", {
+              description: "No se encontraron vehículos que coincidan con tus criterios en este momento."
+            });
+          }
+        } else {
+          // Si no hay resultados en la respuesta o hubo un error
+          if (data.ejecucion?.error) {
+            toast.warning("La alerta se creó, pero hubo un error al ejecutarla", {
+              description: data.ejecucion.error
+            });
+          }
+          
+          // Ejecutar búsqueda como respaldo
+          await runImmediateSearch();
+        }
+        
         setFormData(initialFormData);
       } else {
         toast.error("Error al crear la alerta", {
@@ -208,6 +420,208 @@ export function AlertForm() {
       opacity: 1,
       transition: { type: "spring", stiffness: 300, damping: 24 }
     }
+  };
+
+  // Componente para mostrar los resultados de la búsqueda
+  const SearchResultsComponent = () => {
+    if (!searchResults) return null;
+    
+    return (
+      <motion.div
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: 'auto' }}
+        className="mt-6"
+      >
+        <Card className={`overflow-hidden ${searchResults.noAlertsToProcess ? 'border-amber-200 bg-amber-50/50' : 'border-green-200 bg-green-50/50'}`}>
+          <CardHeader className={`${searchResults.noAlertsToProcess ? 'bg-amber-100/50 border-b border-amber-200' : 'bg-green-100/50 border-b border-green-200'} py-4 px-6`}>
+            <CardTitle className={`text-lg font-medium flex items-center gap-2 ${searchResults.noAlertsToProcess ? 'text-amber-800' : 'text-green-800'}`}>
+              {searchResults.noAlertsToProcess ? (
+                <>
+                  <InfoIcon className="h-5 w-5 text-amber-600" />
+                  Alerta creada con éxito
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  Resultados de la búsqueda inmediata
+                </>
+              )}
+            </CardTitle>
+            <CardDescription className={searchResults.noAlertsToProcess ? 'text-amber-700' : 'text-green-700'}>
+              {searchResults.noAlertsToProcess 
+                ? "Tu alerta ha sido creada con éxito pero no hay resultados disponibles en este momento"
+                : "Hemos ejecutado tu alerta y estos son los resultados encontrados"}
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent className="p-5 space-y-4">
+            {searchResults.noAlertsToProcess ? (
+              <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                <p className="text-amber-700">
+                  Tu alerta ha sido registrada correctamente. Recibirás notificaciones en Telegram cuando encontremos vehículos que coincidan con tus criterios de búsqueda.
+                </p>
+                <p className="text-sm text-gray-600 mt-3">
+                  Las búsquedas se ejecutarán según la frecuencia que has seleccionado y te notificaremos cuando encontremos resultados.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Resultados de Kavak */}
+                  <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="bg-blue-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-shrink-0 w-6 h-6">
+                          <img src="https://www.kavak.com/favicon.ico" alt="Kavak" className="w-full h-full object-contain" />
+                        </div>
+                        <h3 className="font-medium">Kavak</h3>
+                      </div>
+                      <Badge variant={searchResults.kavak.count > 0 ? "success" : "outline"} className="rounded-full">
+                        {searchResults.kavak.count} {searchResults.kavak.count === 1 ? 'resultado' : 'resultados'}
+                      </Badge>
+                    </div>
+                    <div className="p-4">
+                      <p className="text-sm text-gray-600 mb-3">
+                        {searchResults.kavak.count > 0 
+                          ? `Se encontraron ${searchResults.kavak.count} vehículos en Kavak que coinciden con tus criterios.` 
+                          : "No se encontraron vehículos en Kavak que coincidan con tus criterios."}
+                      </p>
+                      <a 
+                        href={searchResults.kavak.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className={`inline-flex items-center gap-1 text-sm font-medium ${searchResults.kavak.count > 0 ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 cursor-not-allowed'}`}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Ver todos
+                      </a>
+                    </div>
+                  </div>
+                  
+                  {/* Resultados de Mercado Libre */}
+                  <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="bg-yellow-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-shrink-0 w-6 h-6">
+                          <img src="https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.0/mercadolibre/favicon.svg" alt="Mercado Libre" className="w-full h-full object-contain" />
+                        </div>
+                        <h3 className="font-medium">Mercado Libre</h3>
+                      </div>
+                      <Badge variant={searchResults.mercadoLibre.count > 0 ? "success" : "outline"} className="rounded-full">
+                        {searchResults.mercadoLibre.count} {searchResults.mercadoLibre.count === 1 ? 'resultado' : 'resultados'}
+                      </Badge>
+                    </div>
+                    <div className="p-4">
+                      <p className="text-sm text-gray-600 mb-3">
+                        {searchResults.mercadoLibre.count > 0 
+                          ? `Se encontraron ${searchResults.mercadoLibre.count} vehículos en Mercado Libre que coinciden con tus criterios.` 
+                          : "No se encontraron vehículos en Mercado Libre que coincidan con tus criterios."}
+                      </p>
+                      <a 
+                        href={searchResults.mercadoLibre.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className={`inline-flex items-center gap-1 text-sm font-medium ${searchResults.mercadoLibre.count > 0 ? 'text-yellow-600 hover:text-yellow-800' : 'text-gray-400 cursor-not-allowed'}`}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Ver todos
+                      </a>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Estado de la notificación Telegram */}
+                <div className="mt-4 p-4 bg-white border border-gray-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
+                      <img src="https://telegram.org/img/favicon.ico" alt="Telegram" className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">Notificación por Telegram</h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {searchResults.telegramSent 
+                          ? "Se ha enviado una notificación con los resultados a tu cuenta de Telegram." 
+                          : "No se ha enviado notificación a Telegram porque no se encontraron resultados."}
+                      </p>
+                    </div>
+                    <div className="ml-auto">
+                      <Badge variant={searchResults.telegramSent ? "success" : "outline"}>
+                        {searchResults.telegramSent ? "Enviado" : "No enviado"}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+            
+            {/* Botón para ejecutar la búsqueda nuevamente */}
+            <div className="flex justify-center mt-4">
+              <Button 
+                type="button" 
+                variant="outline"
+                size="sm"
+                onClick={runImmediateSearch}
+                disabled={searchingResults}
+                className="gap-2"
+              >
+                {searchingResults ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Buscando...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    <span>Ejecutar búsqueda nuevamente</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  };
+
+  // Componente para mostrar errores de búsqueda
+  const SearchErrorComponent = () => {
+    if (!searchError) return null;
+    
+    return (
+      <motion.div 
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: 'auto' }}
+        className="mt-6"
+      >
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error al ejecutar la búsqueda</AlertTitle>
+          <AlertDescription>
+            {searchError}
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={runImmediateSearch}
+              disabled={searchingResults}
+              className="mt-2 gap-2"
+            >
+              {searchingResults ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Intentando nuevamente...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  <span>Intentar nuevamente</span>
+                </>
+              )}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </motion.div>
+    );
   };
 
   return (
@@ -512,13 +926,13 @@ export function AlertForm() {
               </div>
               <Button 
                 type="submit" 
-                disabled={isSubmitting || !isFormValid}
+                disabled={isSubmitting || !isFormValid || searchingResults}
                 className={`w-full sm:w-auto min-w-[140px] gap-2 text-white transition-all ${isFormValid ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-md' : 'bg-blue-400 cursor-not-allowed'}`}
               >
-                {isSubmitting ? (
+                {isSubmitting || searchingResults ? (
                   <>
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    <span>Creando...</span>
+                    <span>{isSubmitting ? 'Creando...' : 'Buscando...'}</span>
                   </>
                 ) : (
                   <>
@@ -530,7 +944,24 @@ export function AlertForm() {
             </CardFooter>
           </form>
         </Card>
+        
+        {searchingResults && (
+          <div className="w-full max-w-4xl mx-auto mt-6">
+            <Card className="p-6 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                <p className="text-lg font-medium text-muted-foreground">Buscando vehículos...</p>
+                <p className="text-sm text-muted-foreground">Esto puede tomar unos segundos</p>
+              </div>
+            </Card>
+          </div>
+        )}
+        
+        <div ref={resultsRef}>
+          {searchError && <SearchErrorComponent />}
+          {searchResults && <SearchResultsComponent />}
+        </div>
       </motion.div>
     </TooltipProvider>
   );
-} 
+}
