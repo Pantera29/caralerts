@@ -90,6 +90,11 @@ export function LandingPageGreen({
               <p className="text-xl text-slate-600 dark:text-slate-300 max-w-3xl mx-auto">
                 Configura alertas personalizadas y recibe notificaciones en Telegram cuando encontremos vehículos que coincidan con tus criterios de búsqueda.
               </p>
+              <div className="flex items-center justify-center mt-3">
+                <p className="text-lg font-medium text-green-600 dark:text-green-400">
+                  Búsquedas automáticas en <span className="font-bold">Kavak</span> y <span className="font-bold">Mercado Libre</span>
+                </p>
+              </div>
             </motion.div>
 
             {/* CTA Button */}
@@ -159,19 +164,26 @@ export function LandingPageGreen({
         </div>
       ) : (
         <div className="bg-white min-h-screen pt-16">
-          <div className="container mx-auto px-4 py-10">
-            <div className="flex flex-col items-center mb-10">
-              <Button 
-                onClick={() => handleSetShowForm(false)} 
-                variant="ghost" 
-                className="mb-6 text-green-600"
-              >
-                ← Volver a la página principal
-              </Button>
-              <h2 className="text-3xl font-bold text-slate-900 mb-2">Configura tu alerta</h2>
-              <p className="text-slate-600 max-w-2xl text-center">
-                Completa el formulario a continuación para recibir notificaciones cuando encontremos vehículos que coincidan con tus criterios.
-              </p>
+          <div className="container mx-auto px-4 py-2">
+            <div className="w-full flex flex-col mb-8">
+              <div className="w-full flex justify-start mb-4">
+                <Button 
+                  onClick={() => handleSetShowForm(false)} 
+                  variant="ghost" 
+                  className="text-green-600"
+                >
+                  ← Volver a la página principal
+                </Button>
+              </div>
+              <div className="text-center">
+                <h2 className="text-3xl font-bold text-slate-900 mb-2">Configura tu alerta</h2>
+                <p className="text-slate-600 max-w-2xl mx-auto">
+                  Completa el formulario a continuación para recibir notificaciones cuando encontremos vehículos que coincidan con tus criterios.
+                </p>
+                <p className="text-green-600 text-sm font-medium mt-2">
+                  Búsquedas automáticas en <span className="font-bold">Kavak</span> y <span className="font-bold">Mercado Libre</span>
+                </p>
+              </div>
             </div>
             <AlertForm />
           </div>

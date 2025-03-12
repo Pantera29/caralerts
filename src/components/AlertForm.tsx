@@ -13,7 +13,6 @@ import {
   DollarSign, 
   Gauge, 
   Send, 
-  Plus,
   Tag
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -238,14 +237,6 @@ export function AlertForm() {
         <Card className="w-full max-w-4xl mx-auto border border-gray-200 shadow-lg rounded-xl overflow-hidden bg-white">
           <CardHeader className="bg-gray-50 border-b border-gray-200 px-6 py-5">
             <motion.div variants={itemVariants}>
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant="outline" className="text-primary bg-primary/10 hover:bg-primary/20 px-2 py-1 text-xs font-medium">
-                  Nuevo
-                </Badge>
-                <Badge variant="outline" className="text-muted-foreground bg-muted hover:bg-muted/80 px-2 py-1 text-xs font-medium">
-                  Vehículos
-                </Badge>
-              </div>
               <CardTitle className="text-2xl font-semibold text-foreground">Nueva Alerta de Vehículos</CardTitle>
               <CardDescription className="text-muted-foreground mt-1">
                 Configura los criterios para recibir notificaciones de vehículos.
@@ -343,7 +334,6 @@ export function AlertForm() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <Plus className="h-4 w-4 text-muted-foreground absolute right-9 top-2.5" />
                     </div>
                     {formErrors.marcas && (
                       <p className="text-xs text-destructive mt-1">{formErrors.marcas}</p>
@@ -425,13 +415,8 @@ export function AlertForm() {
                           value={formData.precio_maximo}
                           onChange={handleInputChange}
                           required
-                          className="pr-24"
+                          className={`transition-all ${formErrors.precio_maximo ? 'border-destructive' : ''}`}
                         />
-                        <div className="absolute right-3 top-2.5">
-                          <Badge variant="outline" className="text-xs font-normal bg-muted/50">
-                            {formatCurrency(formData.precio_maximo)}
-                          </Badge>
-                        </div>
                       </div>
                     </div>
 
@@ -450,13 +435,8 @@ export function AlertForm() {
                           value={formData.kilometraje_maximo}
                           onChange={handleInputChange}
                           required
-                          className="pr-16"
+                          className={`transition-all ${formErrors.kilometraje_maximo ? 'border-destructive' : ''}`}
                         />
-                        <div className="absolute right-3 top-2.5">
-                          <Badge variant="outline" className="text-xs font-normal bg-muted/50">
-                            {formData.kilometraje_maximo.toLocaleString()} km
-                          </Badge>
-                        </div>
                       </div>
                     </div>
                   </div>
