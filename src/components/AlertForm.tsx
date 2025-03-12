@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { AlertFormData, NotificationFrequency } from "@/types/alert";
 import { CAR_BRANDS } from "@/lib/constants";
-import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { 
   InfoIcon, 
@@ -25,7 +24,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Badge } from "@/components/ui/badge";
 
 const initialFormData: AlertFormData = {
   nombre_busqueda: "",
