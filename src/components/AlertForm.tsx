@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { AlertFormData, NotificationFrequency } from "@/types/alert";
-import { CAR_BRANDS } from "@/lib/constants";
 import { toast } from "sonner";
 import { 
   InfoIcon, 
@@ -20,10 +19,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { BrandSelectorSimple } from "@/components/ui/brand-selector-simple";
 
 const initialFormData: AlertFormData = {
   nombre_busqueda: "",
@@ -39,7 +38,6 @@ const initialFormData: AlertFormData = {
 export function AlertForm() {
   const [formData, setFormData] = useState<AlertFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof AlertFormData, string>>>({});
   const [isFormValid, setIsFormValid] = useState(false);
 
@@ -106,33 +104,23 @@ export function AlertForm() {
     }
   };
 
-  const handleBrandSelect = (value: string) => {
-    setSelectedBrand(value);
-    if (!formData.marcas.includes(value)) {
-      const updatedMarcas = [...formData.marcas, value];
-      setFormData({
-        ...formData,
-        marcas: updatedMarcas
-      });
-      
-      // Validar después de actualizar
-      const error = validateField('marcas', updatedMarcas);
-      setFormErrors(prev => ({
-        ...prev,
-        marcas: error
-      }));
-    }
-  };
-
-  const removeBrand = (brand: string) => {
-    const updatedMarcas = formData.marcas.filter(b => b !== brand);
-    setFormData({
-      ...formData,
-      marcas: updatedMarcas
+  const handleBrandChange = (value: string | string[]) => {
+    console.log("AlertForm - handleBrandChange recibió:", value);
+    
+    const brands = Array.isArray(value) ? value : [value];
+    console.log("AlertForm - brands array:", brands);
+    
+    setFormData(prevData => {
+      const newFormData = {
+        ...prevData,
+        marcas: brands
+      };
+      console.log("AlertForm - nuevo formData:", newFormData);
+      return newFormData;
     });
     
     // Validar después de actualizar
-    const error = validateField('marcas', updatedMarcas);
+    const error = validateField('marcas', brands);
     setFormErrors(prev => ({
       ...prev,
       marcas: error
@@ -188,7 +176,6 @@ export function AlertForm() {
           description: "Recibirás notificaciones en Telegram cuando encontremos vehículos que coincidan con tus criterios."
         });
         setFormData(initialFormData);
-        setSelectedBrand("");
       } else {
         toast.error("Error al crear la alerta", {
           description: data.message || "Por favor, intenta nuevamente."
@@ -292,47 +279,13 @@ export function AlertForm() {
                       )}
                     </div>
                     
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {formData.marcas.map(brand => (
-                        <motion.div
-                          key={brand}
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0.8, opacity: 0 }}
-                          className="inline-flex items-center bg-secondary text-secondary-foreground px-3 py-1 rounded-full transition-colors"
-                        >
-                          <span className="text-sm font-medium">{brand}</span>
-                          <Button 
-                            type="button" 
-                            variant="ghost"
-                            size="icon"
-                            className="h-5 w-5 p-0 ml-1 hover:bg-secondary-foreground/10 rounded-full"
-                            onClick={() => removeBrand(brand)}
-                          >
-                            <X className="h-3 w-3" />
-                            <span className="sr-only">Eliminar {brand}</span>
-                          </Button>
-                        </motion.div>
-                      ))}
-                    </div>
+                    <BrandSelectorSimple 
+                      value={formData.marcas}
+                      onChange={(brands) => handleBrandChange(brands)}
+                      placeholder="Seleccionar marcas"
+                      className={formErrors.marcas ? 'border-destructive' : ''}
+                    />
                     
-                    <div className="relative">
-                      <Select onValueChange={handleBrandSelect} value={selectedBrand}>
-                        <SelectTrigger className={`transition-all ${formErrors.marcas ? 'border-destructive' : ''}`}>
-                          <SelectValue placeholder="Seleccionar marca" />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-80 bg-white border-gray-200 shadow-lg">
-                          <div className="p-2 sticky top-0 bg-white border-b border-gray-200 z-10">
-                            <p className="text-xs text-gray-600">Selecciona una o más marcas</p>
-                          </div>
-                          {CAR_BRANDS.map(brand => (
-                            <SelectItem key={brand} value={brand} className="cursor-pointer bg-white text-gray-800 hover:bg-gray-50">
-                              {brand}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
                     {formErrors.marcas && (
                       <p className="text-xs text-destructive mt-1">{formErrors.marcas}</p>
                     )}
