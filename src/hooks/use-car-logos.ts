@@ -16,7 +16,7 @@ const BRAND_NAME_MAP: Record<string, string[]> = {
   'Acura': ['Acura'],
   'Alfa Romeo': ['Alfa Romeo', 'Alfaromeo', 'Alfa'],
   'Audi': ['Audi'],
-  'BAIC': ['BAIC', 'Baic'],
+  'BAIC': ['BAIC', 'Baic', 'BAIC Motor'],
   'BMW': ['BMW'],
   'Buick': ['Buick'],
   'BYD': ['BYD', 'Byd'],
@@ -71,18 +71,6 @@ function normalizeName(name: string): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]/g, "");
-}
-
-// Generar la URL local para el logo SVG basado en el nombre de la marca
-function getLocalSvgUrl(brandName: string): string {
-  // Normalizar el nombre para el archivo (minúsculas, sin espacios ni caracteres especiales)
-  const normalizedName = brandName
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[ -]/g, "");
-  
-  return `/car-logos/${normalizedName}.svg`;
 }
 
 /**

@@ -3,7 +3,6 @@ import { AlertFormData, NotificationFrequency } from "@/types/alert";
 import { toast } from "sonner";
 import { 
   InfoIcon, 
-  X, 
   Bell, 
   Search, 
   Car, 
