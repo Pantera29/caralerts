@@ -15,9 +15,11 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle,
-  Loader2
+  Loader2,
+  CarFront
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,12 +29,14 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { BrandSelectorSimple } from "@/components/ui/brand-selector-simple";
+import { ModelSelector } from "@/components/ui/model-selector";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
 
 const initialFormData: AlertFormData = {
   nombre_busqueda: "",
   marcas: [],
+  modelos: [],
   anio_minimo: 2015,
   anio_maximo: new Date().getFullYear(),
   precio_maximo: 500000,
@@ -55,6 +59,11 @@ interface SearchResults {
   noAlertsToProcess?: boolean;
 }
 
+// Pasar los modelos seleccionados a los resultados de búsqueda
+interface SearchResultsWithModels extends SearchResults {
+  modelos?: string[];
+}
+
 export function AlertForm() {
   const [formData, setFormData] = useState<AlertFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,7 +72,7 @@ export function AlertForm() {
   
   // Nuevos estados para la funcionalidad de búsqueda inmediata
   const [searchingResults, setSearchingResults] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchResultsWithModels | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   
   // Referencia para el scroll automático a los resultados
@@ -149,6 +158,9 @@ export function AlertForm() {
     // Asegurar que marcas siempre sea un array
     const brands = Array.isArray(value) ? value : [value];
     
+    console.log('handleBrandChange - valor recibido:', value);
+    console.log('handleBrandChange - marcas formateadas:', brands);
+    
     setFormData({
       ...formData,
       marcas: brands
@@ -216,7 +228,8 @@ export function AlertForm() {
             count: mercadoLibreCount,
             url: mercadoLibreUrl
           },
-          telegramSent: data.telegramSent || true
+          telegramSent: data.telegramSent || true,
+          modelos: formData.modelos
         });
         
         if (kavakCount > 0 || mercadoLibreCount > 0) {
@@ -250,7 +263,8 @@ export function AlertForm() {
               url: '#'
             },
             telegramSent: false,
-            noAlertsToProcess: true
+            noAlertsToProcess: true,
+            modelos: formData.modelos
           });
           return;
         }
@@ -266,7 +280,8 @@ export function AlertForm() {
           count: data.mercadoLibre?.count || 0,
           url: data.mercadoLibre?.url || '#'
         },
-        telegramSent: data.telegramSent || false
+        telegramSent: data.telegramSent || false,
+        modelos: formData.modelos
       });
       
       if (data.kavak?.count > 0 || data.mercadoLibre?.count > 0) {
@@ -319,14 +334,18 @@ export function AlertForm() {
     setSearchError(null);
 
     try {
-      console.log('Enviando formData:', formData);
-      console.log('Frecuencia seleccionada:', formData.frecuencia);
-      
       // Agregar flag para ejecutar inmediatamente
       const requestData = {
         ...formData,
         ejecutar_inmediatamente: true
       };
+      
+      // Información de depuración para la consola
+      console.log('Enviando datos completos de alerta:', {
+        ...requestData,
+        marcas: requestData.marcas.join(', '),
+        modelos: requestData.modelos.length > 0 ? requestData.modelos.join(', ') : 'ninguno'
+      });
       
       const response = await fetch("https://kavak-meli-bot.francolonghi29.workers.dev/api/alerts", {
         method: "POST",
@@ -358,7 +377,8 @@ export function AlertForm() {
               count: data.ejecucion.mercadoLibre?.count || 0,
               url: data.ejecucion.mercadoLibre?.url || '#'
             },
-            telegramSent: data.ejecucion.telegramSent || false
+            telegramSent: data.ejecucion.telegramSent || false,
+            modelos: formData.modelos
           });
           
           // Mostrar mensaje apropiado según los resultados
@@ -551,6 +571,45 @@ export function AlertForm() {
                     </div>
                   </div>
                 </div>
+                
+                {/* Mostrar información sobre los modelos usados en la búsqueda */}
+                {searchResults.modelos && searchResults.modelos.length > 0 && (
+                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                        <CarFront className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900 flex items-center gap-1">
+                          Modelos específicos
+                        </h4>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {searchResults.modelos.map((modelo, index) => (
+                            <Badge 
+                              key={modelo} 
+                              variant="secondary" 
+                              className={cn(
+                                "bg-white border border-blue-200", 
+                                index === 0 && searchResults.modelos!.length > 1 ? "ring-1 ring-amber-400" : ""
+                              )}
+                            >
+                              {modelo}
+                              {index === 0 && searchResults.modelos!.length > 1 && (
+                                <span className="ml-1 text-[10px] text-amber-600">(ML)</span>
+                              )}
+                            </Badge>
+                          ))}
+                        </div>
+                        {searchResults.modelos.length > 1 && (
+                          <p className="text-xs text-amber-600 flex items-center gap-1 mt-2">
+                            <AlertCircle className="h-3 w-3" />
+                            Mercado Libre solo utiliza el primer modelo en la búsqueda.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
             )}
             
@@ -701,6 +760,41 @@ export function AlertForm() {
                     
                     {formErrors.marcas && (
                       <p className="text-xs text-destructive mt-1">{formErrors.marcas}</p>
+                    )}
+                  </div>
+
+                  {/* Selector de Modelos (nuevo) */}
+                  <div className="mt-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-sm font-medium flex items-center gap-1">
+                        <CarFront className="h-4 w-4 text-muted-foreground" />
+                        Modelos específicos
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <InfoIcon className="h-3.5 w-3.5 ml-1 text-muted-foreground/70" />
+                          </TooltipTrigger>
+                          <TooltipContent className="bg-white p-3 shadow-lg rounded-lg max-w-xs text-sm border border-gray-200">
+                            <p>Los modelos te permiten definir búsquedas más específicas. Selecciona primero las marcas para ver sus modelos disponibles.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </Label>
+                      {formData.modelos.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {formData.modelos.length} {formData.modelos.length === 1 ? 'modelo seleccionado' : 'modelos seleccionados'}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <ModelSelector
+                      value={formData.modelos}
+                      onChange={(models) => setFormData({...formData, modelos: models})}
+                      selectedBrands={formData.marcas}
+                      placeholder="Seleccionar modelos (opcional)"
+                      className={formErrors.modelos ? 'border-destructive' : ''}
+                    />
+                    
+                    {formErrors.modelos && (
+                      <p className="text-xs text-destructive mt-1">{formErrors.modelos}</p>
                     )}
                   </div>
                 </div>
